@@ -299,11 +299,24 @@ Dibuat dengan cinta oleh Zamouré." oninput="previewReceiptFooter()">Terima kasi
 </div>
 <div class="mobile-nav" id="mobileNav"></div>
 <div id="modalRoot"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://bodedoyyomyuxbgfenku.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_Hr61G5JeRBM2eOgyeRnLFg_8JLbzIfN";
-const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let supabase=null;
+async function ensureSupabase(){
+ if(supabase)return supabase;
+ let mod=null,lastError=null;
+ const sources=[
+  'https://esm.sh/@supabase/supabase-js@2',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+ ];
+ for(const src of sources){
+  try{mod=await import(src);if(mod&&typeof mod.createClient==='function')break;mod=null;throw new Error('Modul Supabase tidak menyediakan createClient.')}catch(e){lastError=e;console.warn('Supabase module load failed:',src,e)}
+ }
+ if(!mod||typeof mod.createClient!=='function')throw new Error('Library Supabase tidak berhasil dimuat. Pastikan internet aktif, lalu muat ulang halaman. '+(lastError?.message||''));
+ supabase=mod.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+ return supabase;
+}
 let currentUser=null,currentProfile=null,supabaseReady=false,persistTimer=null,persistRunning=false,persistAgain=false;
 const money=n=>'Rp'+Math.max(0,Number(n)||0).toLocaleString('id-ID');
 const WIB_TZ='Asia/Jakarta';
@@ -381,6 +394,8 @@ async function login(){
  if(!email||!password){alert('Masukkan email dan password.');return}
  button.disabled=true;button.textContent='Menghubungkan...';
  try{
+  button.textContent='Menghubungkan ke Supabase...';
+  await ensureSupabase();
   const {data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;
   currentUser=data.user;
   const {data:profile,error:profileError}=await supabase.from('profiles').select('display_name,role').eq('id',currentUser.id).single();
@@ -388,10 +403,10 @@ async function login(){
   currentProfile=profile;role=profile.role;supabaseReady=true;
   await loadFromSupabase();
   document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('ownerNav').classList.toggle('hidden',role!=='owner');document.getElementById('cashierNav').classList.toggle('hidden',role!=='kasir');document.getElementById('sideName').textContent=profile.display_name|| (role==='owner'?'Owner':'Kasir');document.getElementById('sideRole').textContent=role==='owner'?'Administrator':'Pelayanan';document.getElementById('sideAvatar').textContent=(profile.display_name||role)[0].toUpperCase();document.getElementById('topRole').textContent=role.toUpperCase()+' ACCESS';updateOwnerClock();go(role==='owner'?'dashboard':'cashier');
- }catch(err){console.error(err);await supabase.auth.signOut();currentUser=null;currentProfile=null;supabaseReady=false;alert('Login gagal: '+(err.message||err))}
+ }catch(err){console.error(err);if(supabase){try{await supabase.auth.signOut()}catch(_){}}currentUser=null;currentProfile=null;supabaseReady=false;alert('Login gagal: '+(err.message||err))}
  finally{button.disabled=false;button.textContent='Masuk ke aplikasi →'}
 }
-async function logout(){try{await supabase.auth.signOut()}catch(e){console.warn(e)}currentUser=null;currentProfile=null;supabaseReady=false;document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden');cart=[]}
+async function logout(){try{if(supabase)await supabase.auth.signOut()}catch(e){console.warn(e)}currentUser=null;currentProfile=null;supabaseReady=false;document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden');cart=[]}
 function go(p){if(role==='kasir'&&p!=='cashier')p='cashier';page=p;updateOwnerClock();document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));document.getElementById(p).classList.remove('hidden');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));let titles={dashboard:'Dashboard Overview',cashier:'Kasir / Penjualan',products:'Produk & Menu',transactions:'Riwayat Transaksi',reports:'Laporan Penjualan',settings:'Pengaturan Toko'};document.getElementById('pageTitle').textContent=titles[p];renderMobile();if(p==='dashboard')renderDashboard();if(p==='cashier'){let sd=document.getElementById('saleDate');if(sd){sd.max=today();if(!sd.value)sd.value=today()}renderCashier();renderCart()}if(p==='products')renderAdminProducts();if(p==='transactions')renderTransactions();if(p==='reports')renderReports();if(p==='settings')loadSettings()}
 function renderMobile(){let pages=role==='owner'?[['dashboard','⌂','Home'],['products','▧','Menu'],['transactions','▤','Transaksi'],['reports','◷','Laporan']]:[['cashier','▣','Kasir']];document.getElementById('mobileNav').innerHTML=pages.map(a=>`<button class="${page===a[0]?'active':''}" onclick="go('${a[0]}')"><span>${a[1]}</span>${a[2]}</button>`).join('')}
 const txToday=()=>db.transactions.filter(t=>t.date===today());

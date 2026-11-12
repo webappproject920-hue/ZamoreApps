@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#075b45">
+<meta name="description" content="Zamouré Dessert & Rice Bowl — aplikasi kasir dan pengelolaan toko.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>Zamouré Dessert & Rice Bowl — POS</title>
 <style>
 :root{--green:#079568;--deep:#075b45;--mint:#e8f7f1;--ink:#172b25;--muted:#82918b;--line:#e8eeeb;--bg:#f4f8f6;--white:#fff;--red:#dc5b61;--shadow:0 10px 35px #183c2b0c}
@@ -467,5 +472,21 @@ function previewReceiptFooter(){let el=document.getElementById('receiptFooterPre
 function saveSettings(){if(role!=='owner'){alert('Hanya Owner yang dapat mengubah pengaturan toko.');return}db.settings={name:storeName.value.trim()||'Zamore Dessert',address:storeAddress.value,phone:storePhone.value,footer:storeFooter.value.trim()||'Terima kasih sudah berkunjung!',qris:db.settings.qris||''};save();previewReceiptFooter();alert('Pengaturan toko tersimpan.')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function updateOwnerClock(){let box=document.getElementById('ownerWibClock');if(!box)return;let visible=(role==='owner'||role==='kasir')&&!document.getElementById('app').classList.contains('hidden');box.style.display=visible?'grid':'none';if(visible){document.getElementById('wibClockTime').textContent=wibTime()+' WIB';document.getElementById('wibClockDate').textContent=wibDateLong()}}
-setInterval(updateOwnerClock,1000);window.addEventListener('resize',()=>{if(page==='dashboard')renderDashboardRange()});
+setInterval(updateOwnerClock,1000);
+window.addEventListener('resize',()=>{
+ const app=document.getElementById('app');
+ const from=document.getElementById('dashFrom');
+ const to=document.getElementById('dashTo');
+ if(page==='dashboard' && app && !app.classList.contains('hidden') && from && to && from.value && to.value){
+  renderDashboardRange();
+ }
+});
+
+// PWA: service worker hanya menyimpan shell aplikasi; data Supabase tetap online.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+ window.addEventListener('load', () => {
+  navigator.serviceWorker.register('./sw.js', {scope:'./'})
+   .catch(err => console.warn('PWA service worker gagal didaftarkan:', err));
+ });
+}
 </script></body></html>
